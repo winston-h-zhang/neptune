@@ -3,21 +3,34 @@
 
 use abomonation_derive::Abomonation;
 use ff::PrimeField;
+use rkyv::{with, Archive};
 use serde::{Deserialize, Serialize};
 
 use crate::matrix;
 use crate::matrix::{
     apply_matrix, invert, is_identity, is_invertible, is_square, mat_mul, minor, transpose, Matrix,
 };
+use crate::unsafe_rkyv::Raw;
 use crate::unsafe_serde;
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub type RawVec<F> = Raw<Vec<<F as PrimeField>::Repr>>;
+pub type RawMatrix<F> = Raw<Vec<Vec<<F as PrimeField>::Repr>>>;
+
+#[derive(
+    Clone, Debug, PartialEq, Serialize, Deserialize, Archive, rkyv::Serialize, rkyv::Deserialize,
+)]
 pub struct MdsMatrices<F: PrimeField> {
+    #[with(RawMatrix<F>)]
     pub m: Matrix<F>,
+    #[with(RawMatrix<F>)]
     pub m_inv: Matrix<F>,
+    #[with(RawMatrix<F>)]
     pub m_hat: Matrix<F>,
+    #[with(RawMatrix<F>)]
     pub m_hat_inv: Matrix<F>,
+    #[with(RawMatrix<F>)]
     pub m_prime: Matrix<F>,
+    #[with(RawMatrix<F>)]
     pub m_double_prime: Matrix<F>,
 }
 
@@ -80,11 +93,23 @@ pub fn derive_mds_matrices<F: PrimeField>(m: Matrix<F>) -> MdsMatrices<F> {
 /// This means its first row and column are each dense, and the interior matrix
 /// (minor to the element in both the row and column) is the identity.
 /// We will pluralize this compact structure `sparse_matrixes` to distinguish from `sparse_matrices` from which they are created.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Abomonation)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Serialize,
+    Deserialize,
+    Abomonation,
+    Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+)]
 pub struct SparseMatrix<F: PrimeField> {
     /// `w_hat` is the first column of the M'' matrix. It will be directly multiplied (scalar product) with a row of state elements.
+    #[with(RawVec<F>)]
     pub w_hat: Vec<F>,
     /// `v_rest` contains all but the first (already included in `w_hat`).
+    #[with(RawVec<F>)]
     pub v_rest: Vec<F>,
 }
 
@@ -241,6 +266,7 @@ mod tests {
     use blstrs::Scalar as Fr;
     use ff::Field;
     use matrix::left_apply_matrix;
+    use pasta_curves::pallas::Scalar;
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
 
@@ -403,5 +429,17 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(sparse_matrices, matrices_again);
+    }
+
+    #[test]
+    fn test_roundtrip_serde() {
+        let mds = create_mds_matrices::<Fr>(3);
+        let bytes = rkyv::to_bytes::<_, 1000>(&mds).unwrap();
+        let deserialized = unsafe {
+            rkyv::from_bytes_unchecked::<MdsMatrices<Fr>>(&bytes)
+                .expect("failed to deserialize mds")
+        };
+
+        assert_eq!(mds, deserialized);
     }
 }

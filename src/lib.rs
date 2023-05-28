@@ -10,6 +10,7 @@ use blstrs::Scalar as Fr;
 pub use error::Error;
 use ff::PrimeField;
 use generic_array::GenericArray;
+use rkyv::Archive;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use trait_set::trait_set;
@@ -76,6 +77,8 @@ pub mod batch_hasher;
 
 #[cfg(any(feature = "cuda", feature = "opencl"))]
 pub mod proteus;
+mod rykv_impl;
+mod unsafe_rkyv;
 
 #[cfg(not(any(feature = "cuda", feature = "opencl")))]
 trait_set! {
@@ -100,7 +103,18 @@ pub(crate) const TEST_SEED: [u8; 16] = [
     0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06, 0xbc, 0xe5,
 ];
 
-#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize, Abomonation)]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    PartialEq,
+    Serialize,
+    Deserialize,
+    Abomonation,
+    Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+)]
 pub enum Strength {
     Standard,
     Strengthened,

@@ -10,13 +10,21 @@
 /// Because `neptune` also supports a first-class notion of `Strength`, we include a mechanism for composing
 /// `Strength` with `HashType` so that hashes with `Strength` other than `Standard` (currently only `Strengthened`)
 /// may still express the full range of hash function types.
-use crate::{Arity, Strength};
+use crate::{rykv_impl::ArchivedCType, Arity, Strength};
 use abomonation::Abomonation;
 use abomonation_derive::Abomonation;
 use ff::PrimeField;
+use rkyv::{
+    option::ArchivedOption,
+    ser::Serializer,
+    with::{self, ArchiveWith, DeserializeWith, SerializeWith, Skip},
+    Archive, Fallible,
+};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(
+    Clone, Debug, PartialEq, Serialize, Deserialize, Archive, rkyv::Serialize, rkyv::Deserialize,
+)]
 #[serde(bound(
     serialize = "F: PrimeField + Serialize, A: Arity<F>",
     deserialize = "F: PrimeField + Deserialize<'de>, A: Arity<F>"
@@ -27,67 +35,67 @@ pub enum HashType<F: PrimeField, A: Arity<F>> {
     VariableLength,
     ConstantLength(usize),
     Encryption,
-    Custom(CType<F, A>),
+    Custom(#[with(ArchivedCType)] CType<F, A>),
     Sponge,
 }
 
 impl<F: PrimeField, A: Arity<F>> Abomonation for HashType<F, A> {
     #[inline]
-    unsafe fn entomb<W: std::io::Write>(&self, write: &mut W) -> std::io::Result<()> { 
+    unsafe fn entomb<W: std::io::Write>(&self, write: &mut W) -> std::io::Result<()> {
         match *self {
-            HashType::MerkleTree => {},
+            HashType::MerkleTree => {}
             HashType::MerkleTreeSparse(bitmask) => {
                 bitmask.entomb(write)?;
-            },
-            HashType::VariableLength => {},
+            }
+            HashType::VariableLength => {}
             HashType::ConstantLength(length) => {
                 length.entomb(write)?;
-            },
-            HashType::Encryption => {},
+            }
+            HashType::Encryption => {}
             HashType::Custom(_) => unimplemented!(),
-            HashType::Sponge => {},
+            HashType::Sponge => {}
         };
-        Ok(()) 
+        Ok(())
     }
 
     #[inline]
-    unsafe fn exhume<'a,'b>(&'a mut self, mut bytes: &'b mut [u8]) -> Option<&'b mut [u8]> {
+    unsafe fn exhume<'a, 'b>(&'a mut self, mut bytes: &'b mut [u8]) -> Option<&'b mut [u8]> {
         match *self {
-            HashType::MerkleTree => {},
+            HashType::MerkleTree => {}
             HashType::MerkleTreeSparse(mut bitmask) => {
                 let temp = bytes;
                 bytes = bitmask.exhume(temp)?;
-            },
-            HashType::VariableLength => {},
+            }
+            HashType::VariableLength => {}
             HashType::ConstantLength(mut length) => {
                 let temp = bytes;
                 bytes = length.exhume(temp)?;
-            },
-            HashType::Encryption => {},
+            }
+            HashType::Encryption => {}
             HashType::Custom(_) => unimplemented!(),
-            HashType::Sponge => {},
+            HashType::Sponge => {}
         }
-        Some(bytes) 
+        Some(bytes)
     }
 
     #[inline]
-    fn extent(&self) -> usize { 
+    fn extent(&self) -> usize {
         let mut size = 0;
-        match *self { 
-            HashType::MerkleTree => {},
+        match *self {
+            HashType::MerkleTree => {}
             HashType::MerkleTreeSparse(bitmask) => {
                 size += bitmask.extent();
-            },
-            HashType::VariableLength => {},
+            }
+            HashType::VariableLength => {}
             HashType::ConstantLength(length) => {
                 size += length.extent();
-            },
-            HashType::Encryption => {},
+            }
+            HashType::Encryption => {}
             HashType::Custom(_) => unimplemented!(),
-            HashType::Sponge => {},
+            HashType::Sponge => {}
         }
         size
-     }
+    }
 }
 
 impl<F: PrimeField, A: Arity<F>> HashType<F, A> {

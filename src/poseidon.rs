@@ -1,14 +1,18 @@
 use crate::hash_type::HashType;
 use crate::matrix::Matrix;
-use crate::mds::{create_mds_matrices, factor_to_sparse_matrixes, MdsMatrices, SparseMatrix};
+use crate::mds::{
+    create_mds_matrices, factor_to_sparse_matrixes, MdsMatrices, RawMatrix, RawVec, SparseMatrix,
+};
 use crate::poseidon_alt::{hash_correct, hash_optimized_dynamic};
 use crate::preprocessing::compress_round_constants;
+use crate::unsafe_rkyv::Raw;
 use crate::unsafe_serde;
 use crate::{matrix, quintic_s_box, BatchHasher, Strength, DEFAULT_STRENGTH};
 use crate::{round_constants, round_numbers, Error};
 use abomonation_derive::Abomonation;
 use ff::PrimeField;
 use generic_array::{sequence::GenericSequence, typenum, ArrayLength, GenericArray};
+use rkyv::{with, Archive};
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 use typenum::marker_traits::Unsigned;
@@ -119,17 +123,28 @@ impl<F: PrimeField, A: Arity<F>> abomonation::Abomonation for PoseidonConstants<
     }
 
     unsafe fn exhume<'a, 'b>(&'a mut self, mut bytes: &'b mut [u8]) -> Option<&'b mut [u8]> {
-        let temp = bytes; bytes = self.mds_matrices.exhume(temp)?;
-        let temp = bytes; bytes = unsafe_serde::exhume_option_vec_F(&mut self.round_constants, temp)?;
-        let temp = bytes; bytes = unsafe_serde::exhume_vec_F(&mut self.compressed_round_constants, temp)?;
-        let temp = bytes; bytes = unsafe_serde::exhume_vec_vec_F(&mut self.pre_sparse_matrix, temp)?;
-        let temp = bytes; bytes = unsafe_serde::exhume_vec_sparse_matrix_F(&mut self.sparse_matrixes, temp)?;
-        let temp = bytes; bytes = self.strength.exhume(temp)?;
-        let temp = bytes; bytes = unsafe_serde::exhume_F(&mut self.domain_tag, temp)?;
-        let temp = bytes; bytes = self.full_rounds.exhume(temp)?;
-        let temp = bytes; bytes = self.half_full_rounds.exhume(temp)?;
-        let temp = bytes; bytes = self.partial_rounds.exhume(temp)?;
-        let temp = bytes; bytes = self.hash_type.exhume(temp)?;
+        let temp = bytes;
+        bytes = self.mds_matrices.exhume(temp)?;
+        let temp = bytes;
+        bytes = unsafe_serde::exhume_option_vec_F(&mut self.round_constants, temp)?;
+        let temp = bytes;
+        bytes = unsafe_serde::exhume_vec_F(&mut self.compressed_round_constants, temp)?;
+        let temp = bytes;
+        bytes = unsafe_serde::exhume_vec_vec_F(&mut self.pre_sparse_matrix, temp)?;
+        let temp = bytes;
+        bytes = unsafe_serde::exhume_vec_sparse_matrix_F(&mut self.sparse_matrixes, temp)?;
+        let temp = bytes;
+        bytes = self.strength.exhume(temp)?;
+        let temp = bytes;
+        bytes = unsafe_serde::exhume_F(&mut self.domain_tag, temp)?;
+        let temp = bytes;
+        bytes = self.full_rounds.exhume(temp)?;
+        let temp = bytes;
+        bytes = self.half_full_rounds.exhume(temp)?;
+        let temp = bytes;
+        bytes = self.partial_rounds.exhume(temp)?;
+        let temp = bytes;
+        bytes = self.hash_type.exhume(temp)?;
         Some(bytes)
     }
 
