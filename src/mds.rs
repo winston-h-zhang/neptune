@@ -2,20 +2,33 @@
 #![allow(clippy::ptr_arg)]
 
 use ff::PrimeField;
+use rkyv::Archive;
 use serde::{Deserialize, Serialize};
 
 use crate::matrix;
 use crate::matrix::{
     apply_matrix, invert, is_identity, is_invertible, is_square, mat_mul, minor, transpose, Matrix,
 };
+use crate::unsafe_rkyv::Raw;
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub type RawVec<F> = Raw<Vec<<F as PrimeField>::Repr>>;
+pub type RawMatrix<F> = Raw<Vec<Vec<<F as PrimeField>::Repr>>>;
+
+#[derive(
+    Clone, Debug, PartialEq, Serialize, Deserialize, Archive, rkyv::Serialize, rkyv::Deserialize,
+)]
 pub struct MdsMatrices<F: PrimeField> {
+    #[with(RawMatrix<F>)]
     pub m: Matrix<F>,
+    #[with(RawMatrix<F>)]
     pub m_inv: Matrix<F>,
+    #[with(RawMatrix<F>)]
     pub m_hat: Matrix<F>,
+    #[with(RawMatrix<F>)]
     pub m_hat_inv: Matrix<F>,
+    #[with(RawMatrix<F>)]
     pub m_prime: Matrix<F>,
+    #[with(RawMatrix<F>)]
     pub m_double_prime: Matrix<F>,
 }
 
@@ -45,10 +58,14 @@ pub fn derive_mds_matrices<F: PrimeField>(m: Matrix<F>) -> MdsMatrices<F> {
 /// This means its first row and column are each dense, and the interior matrix
 /// (minor to the element in both the row and column) is the identity.
 /// We will pluralize this compact structure `sparse_matrixes` to distinguish from `sparse_matrices` from which they are created.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Serialize, Deserialize, Archive, rkyv::Serialize, rkyv::Deserialize,
+)]
 pub struct SparseMatrix<F: PrimeField> {
+    #[with(RawVec<F>)]
     /// `w_hat` is the first column of the M'' matrix. It will be directly multiplied (scalar product) with a row of state elements.
     pub w_hat: Vec<F>,
+    #[with(RawVec<F>)]
     /// `v_rest` contains all but the first (already included in `w_hat`).
     pub v_rest: Vec<F>,
 }

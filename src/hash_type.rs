@@ -10,11 +10,14 @@
 /// Because `neptune` also supports a first-class notion of `Strength`, we include a mechanism for composing
 /// `Strength` with `HashType` so that hashes with `Strength` other than `Standard` (currently only `Strengthened`)
 /// may still express the full range of hash function types.
-use crate::{Arity, Strength};
+use crate::{rkyv_impl::ArchivedCType, Arity, Strength};
 use ff::PrimeField;
+use rkyv::Archive;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(
+    Clone, Debug, PartialEq, Serialize, Deserialize, Archive, rkyv::Serialize, rkyv::Deserialize,
+)]
 #[serde(bound(
     serialize = "F: PrimeField + Serialize, A: Arity<F>",
     deserialize = "F: PrimeField + Deserialize<'de>, A: Arity<F>"
@@ -25,7 +28,7 @@ pub enum HashType<F: PrimeField, A: Arity<F>> {
     VariableLength,
     ConstantLength(usize),
     Encryption,
-    Custom(CType<F, A>),
+    Custom(#[with(ArchivedCType)] CType<F, A>),
     Sponge,
 }
 
